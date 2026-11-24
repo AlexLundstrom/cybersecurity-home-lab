@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Turns a Windows 11 VM into the CyberLab target for Scenario 01.
+    Turns a fresh Windows 11 VM into the CyberLab target for Scenario 01.
 
 .DESCRIPTION
     Run as administrator, after the host-only network works. Renames the
@@ -75,3 +75,64 @@ if ($PSCmdlet.ShouldProcess($SharePath, 'Create share and planted file')) {
 
     icacls $SharePath /grant "${VictimUser}:(OI)(CI)RX" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "icacls failed ($LASTEXITCODE)" }
+
+    Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue | Remove-SmbShare -Force
+    New-SmbShare -Name $ShareName -Path $SharePath -ReadAccess $VictimUser `
+        -Description 'CyberLab Scenario 01 target share' | Out-Null
+}
+
+# 5. Firewall: SMB and ping from the lab subnet only
+Say "Allowing SMB and ping from $LabSubnet only"
+if ($PSCmdlet.ShouldProcess('Firewall', 'Add CyberLab rules')) {
+    Get-NetFirewallRule -Group 'CyberLab' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    New-NetFirewallRule -DisplayName 'CyberLab - SMB' -Group 'CyberLab' -Direction Inbound -Action Allow `
+        -Protocol TCP -LocalPort 445 -RemoteAddress $LabSubnet | Out-Null
+    New-NetFirewallRule -DisplayName 'CyberLab - ping' -Group 'CyberLab' -Direction Inbound -Action Allow `
+        -Protocol ICMPv4 -IcmpType 8 -RemoteAddress $LabSubnet | Out-Null
+}
+
+# 6. Audit policy (subcategory GUIDs, so this works on non-English Windows)
+Say 'Turning on audit policies'
+$audit = [ordered]@{
+    'Logon'                   = '{0CCE9215-69AE-11D9-BED3-505054503030}'  # 4624, 4625
+    'Account Lockout'         = '{0CCE9217-69AE-11D9-BED3-505054503030}'  # 4740
+    'User Account Management' = '{0CCE9235-69AE-11D9-BED3-505054503030}'  # 4720, 4740
+    'File Share'              = '{0CCE9224-69AE-11D9-BED3-505054503030}'  # 5140
+    'Detailed File Share'     = '{0CCE9244-69AE-11D9-BED3-505054503030}'  # 5145
+}
+foreach ($name in $audit.Keys) {
+    if ($PSCmdlet.ShouldProcess($name, 'Audit success and failure')) {
+        auditpol /set /subcategory:"$($audit[$name])" /success:enable /failure:enable | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "auditpol failed for $name" }
+    }
+}
+if ($PSCmdlet.ShouldProcess('Security log', 'Set max size to 256 MB')) {
+    wevtutil sl Security /ms:268435456
+}
+
+# 7. Report the defences already in place (not changed)
+Say 'Checking built-in defences'
+$policyFile = Join-Path $env:TEMP 'cyberlab-secpol.inf'
+secedit /export /cfg $policyFile /areas SECURITYPOLICY | Out-Null
+$lockout = Select-String -Path $policyFile -Pattern '^LockoutBadCount\s*=\s*(\d+)' | Select-Object -First 1
+Remove-Item $policyFile -ErrorAction SilentlyContinue
+
+if ($lockout) {
+    $threshold = [int]$lockout.Matches[0].Groups[1].Value
+    if ($threshold -eq 0) {
+        Note 'Lockout is off: the attack works, but event 4740 never fires.'
+    } elseif ($threshold -lt $WordlistSize) {
+        Note "Lockout after $threshold attempts, but the wordlist has $WordlistSize. It will lock before the right password."
+    } else {
+        Note "Lockout after $threshold attempts; the wordlist ($WordlistSize) stays under it."
+    }
+}
+
+$smb = Get-SmbServerConfiguration
+if ($smb.PSObject.Properties.Name -contains 'InvalidAuthenticationDelayTimeInMs') {
+    Note "SMB delays $($smb.InvalidAuthenticationDelayTimeInMs) ms after each failed login."
+}
+
+Say 'Done'
+if ($restartNeeded) { Note 'Restart now so the new computer name takes effect.' }
+Note 'After the restart, snapshot the VM as "vulnerable".'
