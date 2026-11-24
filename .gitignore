@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Full captures stay local; only the trimmed one goes in evidence/
+*capture-full.pcapng
+
+# The file read from the target during the attack
+network-passwords.txt
+
+# Personal session notes and private build instructions
+notes/
+workbook/
