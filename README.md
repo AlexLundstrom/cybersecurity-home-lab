@@ -7,9 +7,10 @@ A small cybersecurity lab I built at home on two virtual machines. Each Scenario
 
 ## Scenarios
 
-| # | Scenario | What happens | Status |
-|---|---|---|---|
-| 01 | SMB brute force | Kali guesses the password of a weak Windows account over SMB, logs in and reads a file from a share. | in progress |
+| #   | Scenario        | What happens                                                                                         | Status |
+| --- | --------------- | ---------------------------------------------------------------------------------------------------- | ------ |
+| 01  | SMB brute force | Kali guesses the password of a weak Windows account over SMB, logs in and reads a file from a share. | Done   |
+
 
 ## The lab
 
