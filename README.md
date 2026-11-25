@@ -7,9 +7,11 @@ A small cybersecurity lab I built at home on two virtual machines. Each Scenario
 
 ## Scenarios
 
-| #   | Scenario        | What happens                                                                                         | Status |
-| --- | --------------- | ---------------------------------------------------------------------------------------------------- | ------ |
-| 01  | SMB brute force | Kali guesses the password of a weak Windows account over SMB, logs in and reads a file from a share. | Done   |
+| #   | Scenario                 | What happens                                                                                           | Status      |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------ | ----------- |
+| 01  | SMB brute force          | Kali guesses the password of a weak Windows account over SMB, logs in and reads a file from a share.   | Done        |
+| 02  | Persistence              | Kali runs commands on the target that enumerates the VM and plants persistence that survives a reboot. | In progress |
+| 03  | Man-in-the-middle attack | Kali puts itself between target and the host to sniff traffic and pull out sensitive information.      | Planned     |
 
 
 ## The lab
